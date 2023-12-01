@@ -6,7 +6,6 @@ import uuid
 import json
 
 app = Flask(__name__)
-#cur = db.conn.cursor()
 
 def check_asset():
     cur = db.conn.cursor()
@@ -14,6 +13,27 @@ def check_asset():
     asset = cur.fetchall()
     cur.close()
     return asset[0][0]
+
+@app.route('/sqs_process', methods=['POST'])
+def sqs_process():
+    try:
+        data = request.get_json()
+        cur = db.conn.cursor()
+        charge_cash = data['charge_amount']
+        try:
+            cur.execute("select asset from asset_table")
+            asset = cur.fetchall()[0][0]
+            asset = asset + charge_cash
+
+            cur.execute("update asset_table set asset={}".format(asset))
+            conn.commit()
+            cur.close()
+            return "update successs"
+        except Exception as e:
+            return "update fail"
+    except Exception as e:
+        return str(e)
+
 
 @app.route('/purchase/<item>', methods=['POST'])
 def purchase(item):
@@ -36,7 +56,7 @@ def purchase(item):
 
 @app.route('/initialize_asset', methods=['POST'])
 def initialize_asset():
-    asset = 3000 
+    asset = 3000
     cur = db.conn.cursor()
     cur.execute("update asset_table set asset={}".format(asset))
     cur.execute("delete from receipt_table")
@@ -78,12 +98,11 @@ def index():
     db.conn.commit()
     cur.close()
     asset = check_asset()
-    print(asset)
     return render_template('index.html', asset=asset)
+
 
 def main():
     app.run(host='0.0.0.0', debug=True)
 
 if __name__ == "__main__":
     main()
-
