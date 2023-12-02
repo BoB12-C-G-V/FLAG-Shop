@@ -4,6 +4,7 @@ import time
 import sqs
 import uuid
 import json
+import os
 
 app = Flask(__name__)
 
@@ -18,19 +19,19 @@ def check_asset():
 def sqs_process():
     try:
         data = request.get_json()
-        cur = db.conn.cursor()
-        charge_cash = data['charge_amount']
-        try:
+        if data['auth'] == os.environ['auth']:
+            charge_cash = data['sqs_request']
+            cur = db.conn.cursor()
             cur.execute("select asset from asset_table")
             asset = cur.fetchall()[0][0]
             asset = asset + charge_cash
-
             cur.execute("update asset_table set asset={}".format(asset))
             conn.commit()
             cur.close()
             return "update successs"
-        except Exception as e:
-            return "update fail"
+        else:
+            return "this is not sqs message"
+        
     except Exception as e:
         return str(e)
 
@@ -71,7 +72,7 @@ def charge_cash(cash):
         msg = {"charge_amount" : cash}
         message_body = json.dumps(msg)
         response = sqs.sqs_client.send_message(QueueUrl=sqs.sqs_queue_url, MessageBody=message_body)
-        time.sleep(15)
+        time.sleep(10)
         return redirect(url_for('index'))
     else:
         return "BAD Request!!"
